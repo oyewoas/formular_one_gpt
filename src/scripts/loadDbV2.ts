@@ -7,6 +7,8 @@ import {
 import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { Document } from "@langchain/core/documents";
 import "dotenv/config";
+import fs from "fs";
+import path from "path";
 type SimilarityMetric = "cosine" | "dot_product" | "euclidean"; // Compute the similarity of two vectors
 
 // Constants
@@ -18,6 +20,7 @@ const {
   ASTRA_DB_ENDPOINT,
 } = process.env;
 
+// All F1 URLs to be processed
 const F1_DATA_URLS = [
   // Core F1 Information
   "https://en.wikipedia.org/wiki/Formula_One", // General F1 overview
@@ -33,7 +36,51 @@ const F1_DATA_URLS = [
 
   // Recent Major News
   "https://www.skysports.com/f1/news/12433/13061245/lewis-hamilton-to-join-ferrari-for-2025-formula-1-season", // Major recent news
+  "https://www.nbcmiami.com/news/sports/how-much-are-f1-drivers-paid-salaries-every-driver-2025/3562092/", // Major recent news
 ];
+
+// File to store processed URLs
+const PROCESSED_URLS_FILE = path.join(__dirname, "processed_urls.json");
+
+// Initialize and load processed URLs
+function initializeProcessedUrls(): Set<string> {
+  try {
+    if (!fs.existsSync(PROCESSED_URLS_FILE)) {
+      // Create file with empty array if it doesn't exist
+      fs.writeFileSync(PROCESSED_URLS_FILE, JSON.stringify([]));
+      console.log("Created new processed_urls.json file");
+      return new Set();
+    }
+
+    // Load and validate existing file
+    const data = fs.readFileSync(PROCESSED_URLS_FILE, "utf8");
+    const urls = JSON.parse(data);
+    if (!Array.isArray(urls)) {
+      throw new Error("Invalid file format");
+    }
+    return new Set(urls);
+  } catch (error) {
+    console.error("Error with processed_urls.json file:", error);
+    // If file is corrupted or invalid, recreate it
+    fs.writeFileSync(PROCESSED_URLS_FILE, JSON.stringify([]));
+    console.log("Recreated processed_urls.json file");
+    return new Set();
+  }
+}
+
+// Save processed URLs to file
+function saveProcessedUrl(url: string): void {
+  try {
+    const processedUrls = initializeProcessedUrls();
+    processedUrls.add(url);
+    fs.writeFileSync(
+      PROCESSED_URLS_FILE,
+      JSON.stringify([...processedUrls], null, 2)
+    );
+  } catch (error) {
+    console.error("Error saving processed URL:", error);
+  }
+}
 
 // Services
 class WebScraper {
@@ -165,18 +212,34 @@ async function main() {
     const scraper = new WebScraper();
     const textProcessor = new TextProcessor();
     const vectorStoreManager = new VectorStoreManager();
+    const processedUrls = initializeProcessedUrls();
 
     await vectorStoreManager.initialize();
 
-    for (const url of F1_DATA_URLS) {
-      console.log(`Processing ${url}...`);
-      const content = await scraper.scrape(url);
-      console.log("Content scraped successfully");
-      const chunks = await textProcessor.splitText(content);
-      console.log(`Split content into ${chunks.length} chunks`);
+    console.log(`Found ${processedUrls.size} previously processed URLs`);
+    console.log(`Processing ${F1_DATA_URLS.length} total URLs...`);
 
-      await vectorStoreManager.addDocuments(chunks);
-      console.log(`Completed processing ${url}`);
+    for (const url of F1_DATA_URLS) {
+      if (processedUrls.has(url)) {
+        console.log(`Skipping already processed URL: ${url}`);
+        continue;
+      }
+
+      console.log(`Processing ${url}...`);
+      try {
+        const content = await scraper.scrape(url);
+        console.log("Content scraped successfully");
+        const chunks = await textProcessor.splitText(content);
+        console.log(`Split content into ${chunks.length} chunks`);
+
+        await vectorStoreManager.addDocuments(chunks);
+        saveProcessedUrl(url);
+        console.log(`Completed processing ${url}`);
+      } catch (error) {
+        console.error(`Error processing ${url}:`, error);
+        // Continue with next URL even if one fails
+        continue;
+      }
     }
 
     console.log("All data has been processed and stored successfully!");
