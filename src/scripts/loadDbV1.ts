@@ -2,11 +2,7 @@ import { DataAPIClient } from "@datastax/astra-db-ts"
 import { PuppeteerWebBaseLoader } from "@langchain/community/document_loaders/web/puppeteer";
 import OpenAI from "openai"
 import {RecursiveCharacterTextSplitter} from "@langchain/textsplitters"
-// import { ChatOpenAI } from "@langchain/openai";
-// import {
-//     AstraDBVectorStore,
-//     AstraLibArgs,
-//   } from "@langchain/community/vectorstores/astradb";
+
 
 import "dotenv/config"
 
@@ -50,7 +46,7 @@ const f1Data = [
 ]
 
 const client = new DataAPIClient(ASTRA_DB_APPLICATION_TOKEN)
-const db = client.db(ASTRA_DB_ENDPOINT, {
+const db = client.db(ASTRA_DB_ENDPOINT as string, {
     namespace: ASTRA_DB_NAMESPACE,
 })
 
@@ -60,7 +56,7 @@ const splitter = new RecursiveCharacterTextSplitter({
 })
 
 const createCollection = async (similarityMetric: SimilarityMetric = "dot_product") => {
-    const res =await db.createCollection(ASTRA_DB_COLLECTION, {
+    const res =await db.createCollection(ASTRA_DB_COLLECTION as string, {
         vector: {
             dimension: 1536,
             metric: similarityMetric,
@@ -73,7 +69,7 @@ const createCollection = async (similarityMetric: SimilarityMetric = "dot_produc
 }
 
 const loadSampleData = async () => {
-    const collection = await db.collection(ASTRA_DB_COLLECTION)
+    const collection = await db.collection(ASTRA_DB_COLLECTION as string)
     for await (const url of f1Data) {
         const content = await scrapePage(url)
         const chunks = await splitter.splitText(content)
