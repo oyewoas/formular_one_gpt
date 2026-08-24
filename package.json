@@ -20,7 +20,7 @@
     "@langchain/textsplitters": "^0.1.0",
     "ai": "^4.3.13",
     "dotenv": "^16.5.0",
-    "next": "15.3.1",
+    "next": "15.5.21",
     "openai": "^4.96.2",
     "puppeteer": "^24.7.2",
     "react": "^19.0.0",
